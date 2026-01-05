@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM Gateway Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --bg-color: #f4f7f6; --console-bg: #1e1e1e; --console-text: #00ff00; }
+        body { background-color: var(--bg-color); font-family: 'Segoe UI', sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .log-container {
+            background: var(--console-bg); color: var(--console-text); padding: 15px;
+            height: 480px; overflow-y: auto; font-family: monospace; font-size: 12px;
+            border-radius: 8px; border: 2px solid #333; white-space: pre-wrap;
+        }
+        .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; background: transparent; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+    <div class="container">
+        <a class="navbar-brand" href="#"><i class="fa-solid fa-microchip me-2 text-info"></i>DICOM Gateway <span class="badge bg-secondary ms-2">RPi v1.0</span></a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="/api/docs" target="_blank"><i class="fa-solid fa-book me-1"></i> API Docs</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header py-3">
+                    <ul class="nav nav-tabs card-header-tabs" id="dicomTab" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-upload">Upload Manual</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-fetch">Orthanc Modify</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-direct">Direct Send</button></li>
+                    </ul>
+                </div>
+                <div class="card-body tab-content">
+                    <div class="tab-pane fade show active" id="tab-upload">
+                        <form id="formRaw">
+                            <div class="mb-3">
+                                <label class="form-label">Pilih File DICOM</label>
+                                <input type="file" class="form-control" name="file" required>
+                            </div>
+                            <div class="row">
+                                <div class="col"><input type="text" class="form-control" name="patientid" placeholder="New Patient ID" required></div>
+                                <div class="col"><input type="text" class="form-control" name="accesionnum" placeholder="New Accession" required></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-3 w-100">Upload & Send</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-fetch">
+                        <form id="formOrt">
+                            <div class="mb-3">
+                                <label class="form-label">Instance ID Orthanc</label>
+                                <input type="text" class="form-control" name="instance_id" placeholder="e.g. 4a0b467b-..." required>
+                            </div>
+                            <div class="row">
+                                <div class="col"><input type="text" class="form-control" name="patientid" placeholder="New Patient ID" required></div>
+                                <div class="col"><input type="text" class="form-control" name="accesionnum" placeholder="New Accession" required></div>
+                            </div>
+                            <button type="submit" class="btn btn-success mt-3 w-100">Fetch, Modify & Send</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-direct">
+                        <form id="formDirect">
+                            <div class="mb-3">
+                                <label class="form-label">Study ID Orthanc</label>
+                                <input type="text" class="form-control" name="study_id" placeholder="ID Study untuk dikirim langsung" required>
+                            </div>
+                            <button type="submit" class="btn btn-warning mt-3 w-100">Direct Send to Router</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-terminal me-2"></i>Live System Log</span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="document.getElementById('logConsole').innerHTML='' ">Clear</button>
+                </div>
+                <div class="card-body">
+                    <div id="logConsole" class="log-container">Menunggu data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Fungsi untuk Update Log Otomatis
+    setInterval(() => {
+        fetch('/api/logs').then(r => r.text()).then(data => {
+            const el = document.getElementById('logConsole');
+            el.innerText = data;
+            el.scrollTop = el.scrollHeight;
+        });
+    }, 2000);
+
+    // Logic Submit Form A (Raw Send)
+    document.getElementById('formRaw').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const res = await fetch('/api/dicom/raw-send', { method: 'POST', body: formData });
+        alert(res.ok ? "Berhasil dikirim!" : "Gagal!");
+    };
+
+    // Logic Submit Form B (Ort Send)
+    document.getElementById('formOrt').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        const res = await fetch('/api/dicom/ort-send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        alert(res.ok ? "Berhasil dimodifikasi & kirim!" : "Gagal!");
+    };
+
+    // Logic Submit Form C (Direct Send)
+    document.getElementById('formDirect').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        const res = await fetch('/api/dicom/dcm-send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        alert(res.ok ? "Perintah kirim berhasil!" : "Gagal!");
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+2026-01-05 17:58:48,514 - INFO - Menerima upload manual: 889E210A.dcm
+2026-01-05 17:58:48,515 - INFO - Memulai modifikasi file: temp_dicom/raw_889E210A.dcm
+2026-01-05 17:58:51,879 - INFO - Berhasil upload ke Orthanc: 85f018bd-8147de8a-40ef8222-2cd6a797-44498d9f
+2026-01-05 17:58:54,307 - INFO - Berhasil instruksi kirim ke DCMROUTER untuk study 1c89faeb-cca5cd1c-07b5a9b6-b935420e-070cfc38
+2026-01-05 19:27:44,065 - INFO - Memproses modifikasi dari Orthanc ID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 19:28:06,130 - INFO - Memproses modifikasi dari Orthanc ID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 19:28:28,198 - INFO - Direct send dipicu untuk Study: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 20:02:02,053 - INFO - Mencari StudyInstanceUID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 20:02:34,888 - INFO - Mencari StudyInstanceUID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.2
+2026-01-05 20:03:17,458 - INFO - Mencari StudyInstanceUID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 20:10:41,170 - ERROR - Koneksi Orthanc Error: 400 Client Error: Bad Request for url: http://192.168.30.21:8042/tools/find
+2026-01-05 20:11:02,105 - ERROR - Koneksi Orthanc Error: 400 Client Error: Bad Request for url: http://192.168.30.21:8042/tools/find
+2026-01-05 20:11:50,402 - INFO - Mencari StudyInstanceUID: 1.3.46.670589.30.39.0.1.966169802732.1695722393202.1
+2026-01-05 20:13:27,912 - ERROR - Koneksi Orthanc Error: 400 Client Error: Bad Request for url: http://192.168.30.21:8042/tools/find
+2026-01-05 20:26:00,884 - INFO - Step 1: Mencari StudyInstanceUID: None
+2026-01-05 20:26:00,984 - ERROR - HTTP Error: {
+	"Details" : "Tag \"StudyInstanceUID\" should be associated with a string",
+	"HttpError" : "Bad Request",
+	"HttpStatus" : 400,
+	"Message" : "Bad request",
+	"Method" : "POST",
+	"OrthancError" : "Bad request",
+	"OrthancStatus" : 8,
+	"Uri" : "/tools/find"
+}
+
+2026-01-05 20:26:52,721 - INFO - Step 1: Mencari StudyInstanceUID: None
+2026-01-05 20:26:53,005 - ERROR - HTTP Error: {
+	"Details" : "Tag \"StudyInstanceUID\" should be associated with a string",
+	"HttpError" : "Bad Request",
+	"HttpStatus" : 400,
+	"Message" : "Bad request",
+	"Method" : "POST",
+	"OrthancError" : "Bad request",
+	"OrthancStatus" : 8,
+	"Uri" : "/tools/find"
+}
+
+2026-01-05 20:28:39,026 - INFO - Target URL: http://192.168.30.21:8042/tools/find
+2026-01-05 20:28:39,026 - INFO - Payload dikirim: {'Level': 'Study', 'Query': {'StudyInstanceUID': '1.3.46.670589.30.39.0.1.966169802732.1695722393202.1'}}
