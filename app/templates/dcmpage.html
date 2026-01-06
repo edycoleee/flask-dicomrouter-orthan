@@ -7,89 +7,85 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --bg-color: #f4f7f6; --console-bg: #1e1e1e; --console-text: #00ff00; }
-        body { background-color: var(--bg-color); font-family: 'Segoe UI', sans-serif; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .log-container {
-            background: var(--console-bg); color: var(--console-text); padding: 15px;
-            height: 480px; overflow-y: auto; font-family: monospace; font-size: 12px;
-            border-radius: 8px; border: 2px solid #333; white-space: pre-wrap;
-        }
-        .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; background: transparent; }
+        :root { --bg: #f8f9fa; --dark: #212529; --green: #00ff00; }
+        body { background: var(--bg); font-family: sans-serif; }
+        .log-box { background: #1a1a1a; color: var(--green); height: 400px; overflow-y: auto; font-family: monospace; font-size: 11px; padding: 10px; border-radius: 5px; }
+        .card { border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-radius: 10px; }
+        .nav-tabs .nav-link { color: #666; }
+        .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid #0d6efd; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+<nav class="navbar navbar-dark bg-dark mb-4">
     <div class="container">
-        <a class="navbar-brand" href="#"><i class="fa-solid fa-microchip me-2 text-info"></i>DICOM Gateway <span class="badge bg-secondary ms-2">RPi v1.0</span></a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link" href="/api/docs" target="_blank"><i class="fa-solid fa-book me-1"></i> API Docs</a>
-        </div>
+        <span class="navbar-brand"><i class="fa-solid fa-server me-2"></i>DICOM Gateway v1.1</span>
+        <a href="/api/docs" class="btn btn-outline-info btn-sm" target="_blank">API Docs</a>
     </div>
 </nav>
 
 <div class="container">
     <div class="row g-4">
-        <div class="col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header py-3">
-                    <ul class="nav nav-tabs card-header-tabs" id="dicomTab" role="tablist">
-                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-upload">Upload Manual</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-fetch">Orthanc Modify</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-direct">Direct Send</button></li>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#upload">Manual</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#modify">Modify</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#direct">Direct</button></li>
                     </ul>
                 </div>
                 <div class="card-body tab-content">
-                    <div class="tab-pane fade show active" id="tab-upload">
-                        <form id="formRaw">
-                            <div class="mb-3">
-                                <label class="form-label">Pilih File DICOM</label>
-                                <input type="file" class="form-control" name="file" required>
+                    <div class="tab-pane fade show active" id="upload">
+                        <form id="fRaw">
+                            <input type="file" name="file" class="form-control mb-2" required>
+                            <div class="row g-2 mb-2">
+                                <div class="col"><input type="text" name="patientid" class="form-control" placeholder="New PatientID" required></div>
+                                <div class="col"><input type="text" name="accesionnum" class="form-control" placeholder="New AccNo" required></div>
                             </div>
-                            <div class="row">
-                                <div class="col"><input type="text" class="form-control" name="patientid" placeholder="New Patient ID" required></div>
-                                <div class="col"><input type="text" class="form-control" name="accesionnum" placeholder="New Accession" required></div>
-                            </div>
-                            <button type="submit" class="btn btn-primary mt-3 w-100">Upload & Send</button>
+                            <button type="submit" class="btn btn-primary w-100">Upload & Send</button>
                         </form>
                     </div>
-
-                    <div class="tab-pane fade" id="tab-fetch">
-                        <form id="formOrt">
-                            <div class="mb-3">
-                                <label class="form-label">Instance ID Orthanc</label>
-                                <input type="text" class="form-control" name="instance_id" placeholder="e.g. 4a0b467b-..." required>
+                    <div class="tab-pane fade" id="modify">
+                        <form id="fMod">
+                            <input type="text" name="StudyInstanceUID" class="form-control mb-2" placeholder="Study Instance UID" required>
+                            <div class="row g-2 mb-2">
+                                <div class="col"><input type="text" name="patientid" class="form-control" placeholder="New PatientID" required></div>
+                                <div class="col"><input type="text" name="accesionnum" class="form-control" placeholder="New AccNo" required></div>
                             </div>
-                            <div class="row">
-                                <div class="col"><input type="text" class="form-control" name="patientid" placeholder="New Patient ID" required></div>
-                                <div class="col"><input type="text" class="form-control" name="accesionnum" placeholder="New Accession" required></div>
-                            </div>
-                            <button type="submit" class="btn btn-success mt-3 w-100">Fetch, Modify & Send</button>
+                            <button type="submit" class="btn btn-success w-100">Modify Study</button>
                         </form>
                     </div>
-
-                    <div class="tab-pane fade" id="tab-direct">
-                        <form id="formDirect">
-                            <div class="mb-3">
-                                <label class="form-label">Study ID Orthanc</label>
-                                <input type="text" class="form-control" name="study_id" placeholder="ID Study untuk dikirim langsung" required>
-                            </div>
-                            <button type="submit" class="btn btn-warning mt-3 w-100">Direct Send to Router</button>
+                    <div class="tab-pane fade" id="direct">
+                        <form id="fDir">
+                            <input type="text" name="StudyInstanceUID" class="form-control mb-2" placeholder="Study Instance UID" required>
+                            <button type="submit" class="btn btn-warning w-100">Send Existing</button>
                         </form>
                     </div>
                 </div>
             </div>
+
+            <div class="card mt-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Temp Storage</span>
+                    <button class="btn btn-danger btn-sm" onclick="clearTemp()">Clear All</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 200px; overflow-y: auto;">
+                    <table class="table table-sm mb-0">
+                        <tbody id="tempList"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <div class="col-lg-6">
-            <div class="card shadow-sm">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <span><i class="fa-solid fa-terminal me-2"></i>Live System Log</span>
-                    <button class="btn btn-sm btn-outline-danger" onclick="document.getElementById('logConsole').innerHTML='' ">Clear</button>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between">
+                    <span>System Logs</span>
+                    <button class="btn btn-sm btn-outline-light" onclick="loadLogs()">Refresh</button>
                 </div>
-                <div class="card-body">
-                    <div id="logConsole" class="log-container">Menunggu data...</div>
+                <div class="card-body bg-dark">
+                    <div id="logs" class="log-box"></div>
                 </div>
             </div>
         </div>
@@ -98,46 +94,37 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Fungsi untuk Update Log Otomatis
-    setInterval(() => {
-        fetch('/api/logs').then(r => r.text()).then(data => {
-            const el = document.getElementById('logConsole');
-            el.innerText = data;
-            el.scrollTop = el.scrollHeight;
-        });
-    }, 2000);
-
-    // Logic Submit Form A (Raw Send)
-    document.getElementById('formRaw').onsubmit = async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const res = await fetch('/api/dicom/raw-send', { method: 'POST', body: formData });
-        alert(res.ok ? "Berhasil dikirim!" : "Gagal!");
+    const apiCall = async (url, method, body, isFile=false) => {
+        const opt = { method };
+        if(body) opt.body = isFile ? body : JSON.stringify(body);
+        if(!isFile && body) opt.headers = {'Content-Type': 'application/json'};
+        const r = await fetch(url, opt);
+        const d = await r.json();
+        alert(r.ok ? "Success" : "Error: " + (d.message || "Failed"));
+        loadTemp();
     };
 
-    // Logic Submit Form B (Ort Send)
-    document.getElementById('formOrt').onsubmit = async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.target));
-        const res = await fetch('/api/dicom/ort-send', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-        alert(res.ok ? "Berhasil dimodifikasi & kirim!" : "Gagal!");
-    };
+    document.getElementById('fRaw').onsubmit = e => { e.preventDefault(); apiCall('/api/dicom/raw-send', 'POST', new FormData(e.target), true); };
+    document.getElementById('fMod').onsubmit = e => { e.preventDefault(); apiCall('/api/dicom/modify-and-send', 'POST', Object.fromEntries(new FormData(e.target))); };
+    document.getElementById('fDir').onsubmit = e => { e.preventDefault(); apiCall('/api/dicom/direct-send', 'POST', Object.fromEntries(new FormData(e.target))); };
 
-    // Logic Submit Form C (Direct Send)
-    document.getElementById('formDirect').onsubmit = async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.target));
-        const res = await fetch('/api/dicom/dcm-send', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-        alert(res.ok ? "Perintah kirim berhasil!" : "Gagal!");
-    };
+    async function loadLogs() {
+        const r = await fetch('/api/logs');
+        document.getElementById('logs').innerText = await r.text();
+    }
+
+    async function loadTemp() {
+        const r = await fetch('/api/dicom/temp-files');
+        const d = await r.json();
+        const html = d.files.map(f => `<tr><td class="ps-3">${f.name} <small class="text-muted">(${f.size})</small></td><td class="text-end"><button class="btn btn-link text-danger p-0 pe-3" onclick="delFile('${f.name}')">×</button></td></tr>`).join('');
+        document.getElementById('tempList').innerHTML = html || '<tr><td class="text-center p-3 text-muted">Empty</td></tr>';
+    }
+
+    async function delFile(n) { if(confirm('Delete?')) apiCall(`/api/dicom/temp-file?filename=${n}`, 'DELETE').then(loadTemp); }
+    async function clearTemp() { if(confirm('Clear all?')) apiCall('/api/dicom/temp-files', 'DELETE').then(loadTemp); }
+
+    setInterval(loadLogs, 3000);
+    loadTemp();
 </script>
 </body>
 </html>

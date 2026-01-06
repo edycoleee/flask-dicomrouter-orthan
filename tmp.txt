@@ -169,3 +169,168 @@ send_to_router(ort_res['ParentStudy'])
 # 7. hapus file di folder temp_dicom
 
 # 8. hapus file dicom sebelumnya di orthanc sehingga tinggal yang baru saja diuploud
+
+
+@dicom_ns.route('/dcm-send')
+class DcmSend(Resource):
+       try:
+            # 1. Cari ID Study di Orthanc
+            logger.info(f"Step 1: Mencari StudyInstanceUID: {study_iuid}")
+            search_payload = {"Level": "Study", "Query": {"StudyInstanceUID": study_iuid}}
+            res_find = requests.post(f"{ORTHANC_URL}/tools/find", json=search_payload, auth=ORTHANC_AUTH)
+            study_ids = res_find.json()
+
+            if not study_ids:
+                return {"status": "error", "message": "Study tidak ditemukan"}, 404
+            
+            orthanc_study_id = study_ids[0]
+            logger.info(f"Step 2: Study ID ditemukan: {orthanc_study_id}")
+
+            # 2. Ambil daftar instance dari study tersebut
+            res_instances = requests.get(f"{ORTHANC_URL}/studies/{orthanc_study_id}/instances", auth=ORTHANC_AUTH)
+            instances = res_instances.json()
+            
+            if not instances:
+                return {"status": "error", "message": "Tidak ada instance dalam study ini"}, 404
+
+            saved_files = []
+            
+            # 3. Loop untuk download setiap instance (atau ambil satu saja)
+            # Di sini kita ambil semua instance dalam study tersebut
+            for inst in instances:
+                instance_id = inst['ID']
+                file_name = f"{instance_id}.dcm"
+                file_path = os.path.join(TEMP_DIR, file_name)
+
+                # 4. Download file DICOM (setara dengan curl -u orthanc:orthanc ... > file.dcm)
+                logger.info(f"Step 3 : Mendownload instance {instance_id}")
+                res_file = requests.get(f"{ORTHANC_URL}/instances/{instance_id}/file", auth=ORTHANC_AUTH, stream=True)
+                
+                if res_file.status_code == 200:
+                    with open(file_path, 'wb') as f:
+                        for chunk in res_file.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    saved_files.append(file_name)
+                    logger.info(f"File berhasil disimpan: {file_path}")
+                else:
+                    logger.error(f"Gagal download instance {instance_id}")
+
+
+# 6. send dcmrouter
+send_to_router(ort_res['ParentStudy'])
+
+
+
+========================================
+
+
+/raw-send {file,patientid,accesionnum}
+# 1. File dicom simpan di lokal (name file : uuid4.dcm)
+logger.info(f"Step 1: Uploud File ke Server API : {file}")
+# 2. Modify dicom tag (patientid, accesion num) file uuid4.dcm 
+logger.info(f"Step 2: Modify dicom tag : {file}")
+# 3. Send ke orthanc  file uuid4.dcm >> instancesid
+logger.info(f"Step 3: Uploud file ke orthanc : {instancesid}")
+# 4. Send orthanc  {instancesid} ke dicom router
+logger.info(f"Step 3: Orthanc ke dicom router : {instancesid}")
+ :
+# --- HELPER FUNCTIONS ---
+def modify_dicom_tags(filepath, patient_id, accession_num):
+    try:
+        cmd = ["dcmodify", "-nb", "-i", f"(0010,0020)={patient_id}", "-i", f"(0008,0050)={accession_num}", filepath]
+        subprocess.run(cmd, check=True, capture_output=True)
+        return True
+    except Exception as e:
+        logger.error(f"dcmodify error: {str(e)}")
+        return False
+
+def upload_to_orthanc(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            r = requests.post(f"{ORTHANC_URL}/instances", auth=ORTHANC_AUTH, data=f.read())
+            return r.json() if r.status_code == 200 else None
+    except Exception as e:
+        logger.error(f"Upload error: {str(e)}")
+        return None
+
+def send_to_router(orthanc_study_id):
+    try:
+        r = requests.post(f"{ORTHANC_URL}/modalities/{MODALITY_NAME}/store", auth=ORTHANC_AUTH, data=orthanc_study_id)
+        return r.status_code == 200
+    except Exception as e:
+        logger.error(f"C-STORE error: {str(e)}")
+        return False
+
+def find_study_by_uid(uid):
+    payload = {"Level": "Study", "Query": {"StudyInstanceUID": uid}}
+    r = requests.post(f"{ORTHANC_URL}/tools/find", json=payload, auth=ORTHANC_AUTH)
+    ids = r.json()
+    return ids[0] if ids else None
+
+@dicom_ns.route('/raw-send')
+class RawSend(Resource):
+    @dicom_ns.expect(raw_upload_parser)
+    def post(self):
+        """Upload file baru -> Modify -> Orthanc -> Router"""
+        args = raw_upload_parser.parse_args()
+        file = args['file']
+        logger.info(f"Step 1: Uploud File ke Server API : {file}")
+
+        # Gunakan subfolder unik per request untuk menghindari tabrakan file
+        request_dir = os.path.join(TEMP_BASE_DIR, str(uuid.uuid4()))
+        os.makedirs(request_dir)
+        path = os.path.join(request_dir, file.filename)
+        
+        try:
+            file.save(path)
+            if modify_dicom_tags(path, args['patientid'], args['accesionnum']):
+            logger.info(f"Step 2: Modify dicom tags: {file},{patientid}, {accesionnum}")
+
+                ort_res = upload_to_orthanc(path)
+                { "ID" : "4a0b467b-2f26e3a1-ed9ee50a-42cad11b-f8f2f90c", 
+                "ParentPatient" : "5b6d5b11-efc2d845-08bef318-71e84568-a2943740", 
+                "ParentSeries" : "79b20ec4-589ca35a-1e008fb2-64c3a051-b697f014", 
+                "ParentStudy" : "a5d9d99e-9e18c97b-952af9c9-9a1a3cdc-dabf01a0", 
+                "Path" : "/instances/4a0b467b-2f26e3a1-ed9ee50a-42cad11b-f8f2f90c", 
+                "Status" : "Success" }
+
+                logger.info(f"Step 3: Modify dicom tags: {file},{patientid}, {accesionnum}")
+                if ort_res:
+                    send_to_router(ort_res['ParentStudy'])
+                    return {"status": "success", "orthanc_id": ort_res['ID']}, 200
+            return {"status": "error", "message": "Gagal modifikasi atau upload"}, 500
+        finally:
+            shutil.rmtree(request_dir, ignore_errors=True)
+
+
+
+1.3.46.670589.30.39.0.1.966169802732.1704831346742.1
+P01372565542
+202512300004
+
+0002,0003 (MediaStorageSOPInstanceUID): 	1.3.46.670589.30.39.0.1.966169802732.1710330424422.2
+0008,0018 (SOPInstanceUID): 			1.3.46.670589.30.39.0.1.966169802732.1710330424422.2
+0020,000d (StudyInstanceUID): 			1.3.46.670589.30.39.0.1.966169802732.1710329877779.1
+0020,000e (SeriesInstanceUID): 			1.3.46.670589.30.39.0.1.966169802732.1710330424512.1
+
+curl -u orthanc:orthanc http://localhost:8042/studies
+[
+   "8ac9b1b9-3947f649-c783c186-80c6cb92-3897136c"
+]
+
+curl -u orthanc:orthanc -X POST   http://192.168.171.85:8042/modalities/DCMROUTER/store   -H "Content-Type: application/json"   -d '["8ac9b1b9-3947f649-c783c186-80c6cb92-3897136c"]''
+{
+   "Description" : "REST API",
+   "FailedInstancesCount" : 0,
+   "InstancesCount" : 1,
+   "LocalAet" : "ORTHANC",
+   "ParentResources" : 
+   [
+      "8ac9b1b9-3947f649-c783c186-80c6cb92-3897136c"
+   ],
+   "RemoteAet" : "DCMROUTER"
+
+
+
+
+
