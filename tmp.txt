@@ -1,0 +1,171 @@
+import os
+import logging
+import subprocess
+import requests
+from flask import Flask, render_template, jsonify
+from flask_restx import Api, Resource, Namespace, fields
+from werkzeug.datastructures import FileStorage
+from logging.handlers import RotatingFileHandler
+
+app = Flask(__name__)
+
+# --- CONFIGURATION ---
+ORTHANC_URL = "http://192.168.30.21:8042"
+ORTHANC_AUTH = ('orthanc', 'orthanc')
+MODALITY_NAME = "DCMROUTER"
+TEMP_DIR = "temp_dicom"
+LOG_FILE = "app_dicom.log"
+
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR)
+
+# --- LOGGER CONFIGURATION ---
+log_handler = RotatingFileHandler(LOG_FILE, maxBytes=500000, backupCount=2)
+log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+log_handler.setFormatter(log_formatter)
+
+logger = logging.getLogger('DicomGateway')
+logger.setLevel(logging.INFO)
+logger.addHandler(log_handler)
+
+# --- FLASK-RESTX SETUP ---
+api = Api(app, version='1.0', title='DICOM Gateway API', 
+          description='Gateway untuk Manipulasi dan Pengiriman DICOM', 
+          doc='/api/docs', prefix='/api')
+
+dicom_ns = Namespace('dicom', description='Operasi DICOM ke Router')
+api.add_namespace(dicom_ns)
+
+# --- MODELS & PARSERS ---
+# A. Parser untuk Raw Upload
+raw_upload_parser = dicom_ns.parser()
+raw_upload_parser.add_argument('file', location='files', type=FileStorage, required=True, help='File DICOM')
+raw_upload_parser.add_argument('patientid', location='form', type=str, required=True)
+raw_upload_parser.add_argument('accesionnum', location='form', type=str, required=True)
+
+# B. Model untuk Edit dari Orthanc
+ort_modify_model = dicom_ns.model('OrtModify', {
+    'instance_id': fields.String(required=True, example='4a0b467b-2f26e3a1...'),
+    'patientid': fields.String(required=True, example='P12345'),
+    'accesionnum': fields.String(required=True, example='ACC999')
+})
+
+# C. Model untuk Direct Send
+direct_send_model = dicom_ns.model('DirectSend', {
+    'study_id': fields.String(required=True, example='a5d9d99e-9e18c97b...')
+})
+
+# --- HELPER FUNCTIONS ---
+def modify_dicom_tags(filepath, patient_id, accession_num):
+    try:
+        logger.info(f"Memulai modifikasi file: {filepath}")
+        cmd = [
+            "dcmodify", "-i", f"(0010,0020)={patient_id}",
+            "-i", f"(0008,0050)={accession_num}", filepath
+        ]
+        subprocess.run(cmd, check=True)
+        return True
+    except Exception as e:
+        logger.error(f"Gagal modifikasi DCM: {str(e)}")
+        return False
+
+def upload_to_orthanc(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            r = requests.post(f"{ORTHANC_URL}/instances", auth=ORTHANC_AUTH, data=f.read())
+            if r.status_code == 200:
+                logger.info(f"Berhasil upload ke Orthanc: {r.json()['ID']}")
+                return r.json()
+        return None
+    except Exception as e:
+        logger.error(f"Gagal upload ke Orthanc: {str(e)}")
+        return None
+
+def send_to_router(study_id):
+    try:
+        url = f"{ORTHANC_URL}/modalities/{MODALITY_NAME}/store"
+        r = requests.post(url, auth=ORTHANC_AUTH, json=[study_id])
+        if r.status_code == 200:
+            logger.info(f"Berhasil instruksi kirim ke {MODALITY_NAME} untuk study {study_id}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Gagal mengirim ke router: {str(e)}")
+        return False
+
+
+@app.route("/api/logs")
+def get_logs():
+    try:
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, 'r') as f:
+                lines = f.readlines()
+                return "".join(lines[-30:])
+        return "Log file not found."
+    except Exception as e:
+        return str(e)
+
+# --- API ENDPOINTS ---
+
+@dicom_ns.route('/modif-dcm')
+class SaveDicom(Resource):
+    @dicom_ns.expect(save_model)
+    def post(self):
+        """Ambil file DICOM dari Orthanc dan simpan ke folder lokal /temp_dicom"""
+        data = dicom_ns.payload
+        study_iuid = data.get('StudyInstanceUID')
+        
+        try:
+            # 1. Cari ID Study di Orthanc
+            logger.info(f"Step 1: Mencari StudyInstanceUID: {study_iuid}")
+            search_payload = {"Level": "Study", "Query": {"StudyInstanceUID": study_iuid}}
+            res_find = requests.post(f"{ORTHANC_URL}/tools/find", json=search_payload, auth=ORTHANC_AUTH)
+            study_ids = res_find.json()
+
+            if not study_ids:
+                return {"status": "error", "message": "Study tidak ditemukan"}, 404
+            
+            orthanc_study_id = study_ids[0]
+            logger.info(f"Step 2: Study ID ditemukan: {orthanc_study_id}")
+
+            # 2. Ambil daftar instance dari study tersebut
+            res_instances = requests.get(f"{ORTHANC_URL}/studies/{orthanc_study_id}/instances", auth=ORTHANC_AUTH)
+            instances = res_instances.json()
+            
+            if not instances:
+                return {"status": "error", "message": "Tidak ada instance dalam study ini"}, 404
+
+            saved_files = []
+            
+            # 3. Loop untuk download setiap instance (atau ambil satu saja)
+            # Di sini kita ambil semua instance dalam study tersebut
+            for inst in instances:
+                instance_id = inst['ID']
+                file_name = f"{instance_id}.dcm"
+                file_path = os.path.join(TEMP_DIR, file_name)
+
+                # 4. Download file DICOM (setara dengan curl -u orthanc:orthanc ... > file.dcm)
+                logger.info(f"Step 3 : Mendownload instance {instance_id}")
+                res_file = requests.get(f"{ORTHANC_URL}/instances/{instance_id}/file", auth=ORTHANC_AUTH, stream=True)
+                
+                if res_file.status_code == 200:
+                    with open(file_path, 'wb') as f:
+                        for chunk in res_file.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    saved_files.append(file_name)
+                    logger.info(f"File berhasil disimpan: {file_path}")
+                else:
+                    logger.error(f"Gagal download instance {instance_id}")
+
+# 4. dcm modify 
+modify_dicom_tags(path, args['patientid'], args['accesionnum'])
+
+# 5. send ulang ke orthanc
+ort_res = upload_to_orthanc(path)
+
+# 6. send ulang ke orthanc
+send_to_router(ort_res['ParentStudy'])
+
+# 7. hapus file di folder temp_dicom
+
+# 8. hapus file dicom sebelumnya di orthanc sehingga tinggal yang baru saja diuploud
