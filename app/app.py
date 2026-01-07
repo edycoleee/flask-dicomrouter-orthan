@@ -31,8 +31,8 @@ logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
 
 # --- FLASK-RESTX SETUP ---
-api = Api(app, version='1.0', title='DICOM Gateway API', 
-          description='Gateway untuk Manipulasi dan Pengiriman DICOM', 
+api = Api(app, version='1.0', title='DICOM Gateway API dengan ORTHANC', 
+          description='Gateway untuk Manipulasi dan Pengiriman DICOM ke dicom-router satusehat', 
           doc='/api/docs', prefix='/api')
 
 dicom_ns = Namespace('dicom', description='Operasi DICOM ke Router')
@@ -45,13 +45,13 @@ raw_upload_parser.add_argument('patientid', location='form', type=str, required=
 raw_upload_parser.add_argument('accesionnum', location='form', type=str, required=True)
 
 modify_model = dicom_ns.model('ModifyModel', {
-    'StudyInstanceUID': fields.String(required=True),
-    'patientid': fields.String(required=True),
-    'accesionnum': fields.String(required=True)
+    'StudyInstanceUID': fields.String(required=True, example='1.3.46...'),
+    'patientid': fields.String(required=True, example='P00001349...'),
+    'accesionnum': fields.String(required=True, example='202512300002')
 })
 
 study_uid_model = dicom_ns.model('StudyUIDModel', {
-    'StudyInstanceUID': fields.String(required=True)
+    'StudyInstanceUID': fields.String(required=True, example='1.3.46...')
 })
 
 delete_file_parser = dicom_ns.parser()
@@ -96,7 +96,7 @@ def find_study_by_uid(uid):
 class RawSend(Resource):
     @dicom_ns.expect(raw_upload_parser)
     def post(self):
-        """Upload file baru -> Modify -> Orthanc -> Router"""
+        """Upload file dcm baru -> Modify -> Orthanc -> Router"""
         args = raw_upload_parser.parse_args()
         file = args['file']
         patient_id = args['patientid']
@@ -160,6 +160,7 @@ class RawSend(Resource):
 class DirectSend(Resource):
     @dicom_ns.expect(study_uid_model)
     def post(self):
+        """Orthanc -> Router"""
         uid = dicom_ns.payload.get('StudyInstanceUID')
         orthanc_id = find_study_by_uid(uid)
         if not orthanc_id: return {"status": "error", "message": "Study not found"}, 404
@@ -170,6 +171,7 @@ class DirectSend(Resource):
 class ModifyAndSend(Resource):
     @dicom_ns.expect(modify_model)
     def post(self):
+        """Orthanc -> Modify -> Orthanc, hapus yg lama -> Router"""
         data = dicom_ns.payload
         old_id = find_study_by_uid(data['StudyInstanceUID'])
         if not old_id: return {"status": "error", "message": "Source study not found"}, 404
@@ -197,6 +199,7 @@ class ModifyAndSend(Resource):
 @dicom_ns.route('/temp-files')
 class TempFiles(Resource):
     def get(self):
+        """Lihat temp file"""
         files = []
         for root, _, filenames in os.walk(TEMP_BASE_DIR):
             for f in filenames:
@@ -205,6 +208,7 @@ class TempFiles(Resource):
         return {"files": files}
     
     def delete(self):
+        """Hapus semua temp file"""
         shutil.rmtree(TEMP_BASE_DIR)
         os.makedirs(TEMP_BASE_DIR)
         return {"message": "Temp cleared"}
@@ -213,6 +217,7 @@ class TempFiles(Resource):
 class DeleteSingleFile(Resource):
     @dicom_ns.expect(delete_file_parser)
     def delete(self):
+        """Hapus temp file by nama file"""
         fname = delete_file_parser.parse_args()['filename']
         for root, _, filenames in os.walk(TEMP_BASE_DIR):
             if fname in filenames:
