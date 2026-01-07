@@ -152,7 +152,7 @@ Endpoint ini digunakan untuk mengambil data yang sudah ada di Orthanc, mengubah 
 ```JSON
 {
   "instance_id": "4a0b467b-2f26e3a1-ed9ee50a-42cad11b-f8f2f90c",
-  "patientid": "P02371443444",
+  "patientid": "P0237144....",
   "accesionnum": "202512300001"
 }
 ```
@@ -186,3 +186,24 @@ C. POST /api/dicom/dcm-send
 ![Gambar api dicom gateway](images/web-man-orthanc.png)
 
 ![Gambar api dicom gateway](images/web-mod-orthanc.png)
+
+### CLONE DAN RUNNING DI DOCKER
+
+```
+git clone https://github.com/edycoleee/flask-dicomrouter-orthan dicom-gateway
+
+dicom-gateway/
+├── app.py              # Kode Flask Anda
+├── Dockerfile          # File untuk build image
+├── docker-compose.yml  # File konfigurasi container
+├── requirements.txt    # Daftar library python
+├── templates/
+│   └── dcmpage.html    # File UI
+└── temp_dicom/         # Folder temporary (akan dibuat otomatis)
+
+
+cd dicom-gateway
+docker-compose up --build -d
+docker-compose ps
+docker logs -f dicom-gateway-app
+```

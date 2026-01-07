@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  dicom-gateway:
+    build: .
+    container_name: dicom-gateway-app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./temp_dicom:/app/temp_dicom
+      - ./app_dicom.log:/app/app_dicom.log
+    environment:
+      - ORTHANC_URL=http://192.168.171.85:8042
+      - ORTHANC_USER=orthanc
+      - ORTHANC_PASS=orthanc
+    restart: always
