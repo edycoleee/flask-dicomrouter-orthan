@@ -21,3 +21,4 @@
 2026-01-06 14:36:49,920 - INFO - Step 3: Upload file ke orthanc Berhasil: 9ce013ac-416a14c4-76f4fd19-9d876d1a-d248963a,d35c4ef1-cb3cb527-25617379-a5dc7cab-7d01bd9d
 2026-01-06 14:36:50,810 - INFO - Step 4: Orthanc ke dicom router Berhasil: d35c4ef1-cb3cb527-25617379-a5dc7cab-7d01bd9d
 2026-01-06 14:36:50,811 - INFO - Cleanup: Temporary file 4ed9c204-1663-4cc7-82e8-b6c5fa6b7272.dcm dihapus
+2026-01-09 07:50:30,094 - ERROR - No ImagingStudy found for this Accession Number

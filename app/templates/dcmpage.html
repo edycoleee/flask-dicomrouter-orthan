@@ -13,6 +13,7 @@
         .card { border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-radius: 10px; }
         .nav-tabs .nav-link { color: #666; }
         .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid #0d6efd; }
+        .result-box { background: #f0f7ff; border: 1px solid #cfe2ff; padding: 10px; border-radius: 5px; font-size: 13px; display: none; }
     </style>
 </head>
 <body>
@@ -33,6 +34,7 @@
                         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#upload">Manual</button></li>
                         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#modify">Modify</button></li>
                         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#direct">Direct</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#satusehat"><i class="fa-solid fa-cloud me-1"></i>SatuSehat</button></li>
                     </ul>
                 </div>
                 <div class="card-body tab-content">
@@ -61,6 +63,19 @@
                             <input type="text" name="StudyInstanceUID" class="form-control mb-2" placeholder="Study Instance UID" required>
                             <button type="submit" class="btn btn-warning w-100">Send Existing</button>
                         </form>
+                    </div>
+                    <div class="tab-pane fade" id="satusehat">
+                        <p class="small text-muted mb-2">Cari ID ImagingStudy berdasarkan Accession Number.</p>
+                        <div class="input-group mb-3">
+                            <input type="text" id="ssAccNo" class="form-control" placeholder="Contoh: 202512300002">
+                            <button class="btn btn-info text-white" type="button" onclick="searchSatuSehat()">Cari ID</button>
+                        </div>
+                        <div id="ssResult" class="result-box">
+                            <strong>ID Ditemukan:</strong><br>
+                            <code id="resId" class="text-primary"></code>
+                            <hr class="my-1">
+                            <strong>Subject:</strong> <span id="resSub"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -100,9 +115,31 @@
         if(!isFile && body) opt.headers = {'Content-Type': 'application/json'};
         const r = await fetch(url, opt);
         const d = await r.json();
-        alert(r.ok ? "Success" : "Error: " + (d.message || "Failed"));
+        alert(r.ok ? "Success" : "Error: " + (d.message || d.error || "Failed"));
         loadTemp();
     };
+
+    // Fungsi Baru: Search SatuSehat
+    async function searchSatuSehat() {
+        const acsn = document.getElementById('ssAccNo').value;
+        const resBox = document.getElementById('ssResult');
+        if(!acsn) return alert("Masukkan Accession Number");
+
+        resBox.style.display = 'none';
+        try {
+            const r = await fetch(`/api/dicom/imageid/${acsn}`);
+            const d = await r.json();
+            if(r.ok) {
+                document.getElementById('resId').innerText = d.imagingStudy_id;
+                document.getElementById('resSub').innerText = d.patient_reference || '-';
+                resBox.style.display = 'block';
+            } else {
+                alert("Data tidak ditemukan di SatuSehat.");
+            }
+        } catch(e) {
+            alert("Terjadi kesalahan koneksi.");
+        }
+    }
 
     document.getElementById('fRaw').onsubmit = e => { e.preventDefault(); apiCall('/api/dicom/raw-send', 'POST', new FormData(e.target), true); };
     document.getElementById('fMod').onsubmit = e => { e.preventDefault(); apiCall('/api/dicom/modify-and-send', 'POST', Object.fromEntries(new FormData(e.target))); };
@@ -115,6 +152,7 @@
 
     async function loadTemp() {
         const r = await fetch('/api/dicom/temp-files');
+        if(!r.ok) return;
         const d = await r.json();
         const html = d.files.map(f => `<tr><td class="ps-3">${f.name} <small class="text-muted">(${f.size})</small></td><td class="text-end"><button class="btn btn-link text-danger p-0 pe-3" onclick="delFile('${f.name}')">×</button></td></tr>`).join('');
         document.getElementById('tempList').innerHTML = html || '<tr><td class="text-center p-3 text-muted">Empty</td></tr>';

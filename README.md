@@ -175,7 +175,56 @@ C. POST /api/dicom/dcm-send
   "status": "sent to router"
 }
 ```
-- api dokumentasi : http://<#ip-flaskserver>/api/docs
+
+
+D. GET /api/dicom/imageid/{acsn}
+
+- Endpoint ini digunakan untuk mengambil UUID ImagingStudy dari server SatuSehat berdasarkan Accession Number yang terdaftar.
+
+- Deskripsi: Melakukan autentikasi ke OAuth2 SatuSehat, kemudian melakukan query ke FHIR server menggunakan sistem identifier spesifik Organisasi untuk mendapatkan ID resource ImagingStudy.
+
+- Parameter URL:
+
+acsn (String): Nomor akses unik (Accession Number) dari PACS atau SatuSehat.
+
+- Header:
+
+Accept: application/json
+
+- Contoh Request: GET /api/dicom/imageid/202512300002
+
+Respon Sukses (200 OK):
+
+```JSON
+
+{
+  "status": "success",
+  "imagingStudy_id": "876f827a-590b-4e8c-859a-xxxxxxxxxxxx",
+  "patient_reference": "Patient/1000000001"
+}
+```
+
+Respon Error (404 Not Found):
+
+```JSON
+
+{
+  "status": "error",
+  "message": "No ImagingStudy found for this Accession Number"
+}
+```
+Respon Error (502 Bad Gateway):
+
+```JSON
+
+{
+  "status": "error",
+  "message": "Auth SatuSehat failed",
+  "detail": "Connection Timeout"
+}
+```
+
+E.  api dokumentasi : http://<#ip-flaskserver>/api/docs
 
 ![Gambar api dicom gateway](images/api-docs-orthanc.png)
 
@@ -186,6 +235,8 @@ C. POST /api/dicom/dcm-send
 ![Gambar api dicom gateway](images/web-man-orthanc.png)
 
 ![Gambar api dicom gateway](images/web-mod-orthanc.png)
+
+![Gambar api dicom gateway](images/web-img-orthanc.png)
 
 ### CLONE DAN RUNNING DI DOCKER
 
@@ -391,3 +442,19 @@ Exception: ServiceRequest not found
 I: Encryption Config is False
 I: Deleting association folder
  ```
+
+ ### MEMASTIKAN IMAGE SUDAH DITERIMA OLEH SATUSEHAT
+
+ GET  http://192.168.171.123:5000/api/dicom/imageid/20250002
+
+ Lookup ImagingStudy by ACSN and return the ImagingStudy id.
+ 
+ 	
+Response body
+```json
+ {
+  "status": "success",
+  "imagingStudy_id": "75b7e9d0-c079-419c-84f8-8dba7b9cd585",
+  "patient_reference": "Patient/P104430137--"
+}
+```

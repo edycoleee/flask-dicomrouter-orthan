@@ -57,6 +57,31 @@ study_uid_model = dicom_ns.model('StudyUIDModel', {
 delete_file_parser = dicom_ns.parser()
 delete_file_parser.add_argument('filename', type=str, required=True)
 
+# --- SATUSEHAT CONFIG ---
+AUTH_URL = "https://api-satusehat.kemkes.go.id/oauth2/v1"
+BASE_URL = "https://api-satusehat.kemkes.go.id/fhir-r4/v1"
+ORG_ID = "1000xxxxxx"
+CLIENT_ID = "Gzn7Yjxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+CLIENT_SECRET = "fbPy8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# --- HELPER SATUSEHAT ---
+def fetch_ss_token():
+    token_url = f"{AUTH_URL}/accesstoken?grant_type=client_credentials"
+    try:
+        resp = requests.post(token_url, data={"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET}, timeout=15)
+        resp.raise_for_status()
+        return resp.json().get("access_token"), None
+    except Exception as e:
+        return None, str(e)
+
+def fhir_get(url, token):
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/fhir+json"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=20)
+        return resp.json(), resp.status_code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
 # --- HELPER FUNCTIONS ---
 def modify_dicom_tags(filepath, patient_id, accession_num):
     try:
@@ -224,6 +249,41 @@ class DeleteSingleFile(Resource):
                 os.remove(os.path.join(root, fname))
                 return {"message": "Deleted"}
         return {"message": "Not found"}, 404
+
+
+@dicom_ns.route('/imageid/<string:acsn>')
+@dicom_ns.doc(params={'acsn': 'Accession Number dari PACS/SatuSehat'})
+class ImageId(Resource):
+    def get(self, acsn):
+        """Ambil ImagingStudy ID dari SatuSehat berdasarkan Accession Number"""
+        token, err = fetch_ss_token()
+        if err:
+            logger.error(f"Auth SatuSehat failed")
+            return {"status": "error", "message": "Auth SatuSehat failed", "detail": err}, 502
+        
+        identifier_system = f"http://sys-ids.kemkes.go.id/acsn/{ORG_ID}"
+        url = f"{BASE_URL}/ImagingStudy?identifier={identifier_system}|{acsn}"
+        
+        data, status = fhir_get(url, token)
+        
+        if status != 200:
+            return {"status": "error", "detail": data}, status
+
+        # Parsing Bundle response
+        if data.get("resourceType") == "Bundle":
+            entries = data.get("entry") or []
+            for e in entries:
+                res = e.get("resource") or {}
+                if res.get("resourceType") == "ImagingStudy":
+                    logger.info(f"imagingStudy_id :", res.get("id"))    
+                    return {
+                        "status": "success",
+                        "imagingStudy_id": res.get("id"),
+                        "patient_reference": res.get("subject", {}).get("reference")
+                    }, 200
+
+        logger.error(f"No ImagingStudy found for this Accession Number")    
+        return {"status": "error", "message": "No ImagingStudy found for this Accession Number"}, 404
 
 # --- WEB ROUTES ---
 @app.route("/")
